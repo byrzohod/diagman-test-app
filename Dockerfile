@@ -1,5 +1,5 @@
-# Build stage
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+# Build stage - using .NET 10 preview
+FROM mcr.microsoft.com/dotnet/nightly/sdk:10.0-preview AS build
 WORKDIR /src
 
 # Copy project file and restore
@@ -10,8 +10,8 @@ RUN dotnet restore DiagManTestApp/DiagManTestApp.csproj
 COPY src/DiagManTestApp/ ./DiagManTestApp/
 RUN dotnet publish DiagManTestApp/DiagManTestApp.csproj -c Release -o /app/publish
 
-# Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+# Runtime stage - using .NET 10 preview
+FROM mcr.microsoft.com/dotnet/nightly/aspnet:10.0-preview AS runtime
 WORKDIR /app
 
 # Copy published app
