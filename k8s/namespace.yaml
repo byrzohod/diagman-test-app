@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: diagman-test
+  labels:
+    app.kubernetes.io/name: diagman-test-app
+    app.kubernetes.io/part-of: diagman-testing

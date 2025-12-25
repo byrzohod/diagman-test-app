@@ -1,0 +1,101 @@
+# Scenario 5: External API Timeout Cascade
+# This deployment will experience cascading failures when external API is slow
+# Uses a mock external API sidecar that simulates slow responses
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: testapp-timeout-cascade
+  namespace: diagman-test
+  labels:
+    app: testapp
+    scenario: timeout-cascade
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: testapp
+      scenario: timeout-cascade
+  template:
+    metadata:
+      labels:
+        app: testapp
+        scenario: timeout-cascade
+    spec:
+      containers:
+        - name: testapp
+          image: diagman-test-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+            - name: Scenarios__Mode
+              value: "normal"
+            # Point to slow mock API sidecar
+            - name: ExternalApi__Url
+              value: "http://localhost:3000"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+        # Mock slow external API using a simple Node.js container
+        - name: slow-api
+          image: node:20-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cat > /app/server.js << 'EOF'
+              const http = require('http');
+              const server = http.createServer((req, res) => {
+                // Simulate slow response (5-15 seconds)
+                const delay = 5000 + Math.random() * 10000;
+                console.log(`Request received, will respond in ${delay}ms`);
+                setTimeout(() => {
+                  res.writeHead(200, {'Content-Type': 'application/json'});
+                  res.end(JSON.stringify({data: 'slow response', delay}));
+                }, delay);
+              });
+              server.listen(3000, () => console.log('Slow API on port 3000'));
+              EOF
+              node /app/server.js
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: testapp-timeout-cascade
+  namespace: diagman-test
+spec:
+  selector:
+    app: testapp
+    scenario: timeout-cascade
+  ports:
+    - port: 80
+      targetPort: 8080
